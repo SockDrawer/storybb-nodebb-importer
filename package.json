@@ -1,0 +1,27 @@
+{
+  "name": "storybb-nodebb-importer",
+  "version": "1.0.0",
+  "description": "import from nodebb to storybb",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SockDrawer/storybb-nodebb-importer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SockDrawer/storybb-nodebb-importer/issues"
+  },
+  "homepage": "https://github.com/SockDrawer/storybb-nodebb-importer#readme",
+  "dependencies": {
+    "fs-extra": "^4.0.2",
+    "fs-promise": "^2.0.3",
+    "prompt": "^1.0.0",
+    "request": "^2.83.0",
+    "sqlstring": "^2.3.0",
+    "yargs": "^9.0.1"
+  }
+}

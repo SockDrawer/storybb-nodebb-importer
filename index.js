@@ -1,13 +1,39 @@
 const fs = require('fs-extra');
 const prompt = require('prompt');
 const SqlString = require('sqlstring');
+const tidy = require('htmltidy').tidy;
 const rp = require('request-promise');
+const sanitizeHtml = require('sanitize-html');
 prompt.start();
 const argv = require('yargs')
         .demandOption(['out', 'topic', 'board'])
         .argv
         
 let inputJson;
+
+function clean(post) {
+    let out = sanitizeHtml(post, {
+      allowedTags: [ 'b', 'i', 'em', 'strong', 'a', 'img', 'blockquote', 'h1', 'h2', 'h3' ],
+      allowedAttributes: {
+        'a': [ 'href' ],
+        'img': ['class', 'src', 'title']
+      }
+    });
+
+
+    return new Promise((resolve, reject) => {
+        
+        return resolve(out)
+ /*       tidy(post, {
+            doctype: 'omit',
+            showBodyOnly: 'yes'
+        },
+            (err, html) => {
+            if (err) return reject(err);
+            resolve(html);
+        });*/
+    });
+}
 
 function fetchAllPages(topic, start, cookieJar, posts) {
     console.log(`getting page ${start}`);
@@ -21,7 +47,6 @@ function fetchAllPages(topic, start, cookieJar, posts) {
         if (results.pagination.next.active) {
             return fetchAllPages(topic, start+1, cookieJar, posts);
         } else {
-            fs.writeJsonSync('debug.out', posts);
             return Promise.resolve({
                 title: results.title,
                 posts: posts
@@ -29,6 +54,10 @@ function fetchAllPages(topic, start, cookieJar, posts) {
         }
     });
         
+}
+
+async function makePostOutput(item, users) {
+    return `(${argv.topic}, ${argv.board}, ${item.timestamp/1000}, ${users[item.user.username]}, (select id_character FROM sbb_characters WHERE is_main=1 and id_member=${users[item.user.username]}), ${SqlString.escape(inputJson.title)}, ${SqlString.escape(await clean(item.content))})`
 }
 
 function getPosts() {
@@ -73,6 +102,9 @@ fs.ensureFile(argv.out)
 })
 .then(ij => {
     inputJson = ij;
+    
+ //   fs.writeFile(argv.out, JSON.stringify(ij));
+  //  return;
   
   //get all members
   let memberList = inputJson.posts.map((item) => item.user.username);
@@ -85,13 +117,11 @@ fs.ensureFile(argv.out)
           else return resolve(result);
       });
   });
- }).then((users) => {
+ }).then(async (users) => {
   
   let preamble = "INSERT INTO sbb_messages (id_topic, id_board, poster_time, id_member, id_character, subject, body) VALUES ";
-  let posts = inputJson.posts.map((item) => {
-      
-      return `(${argv.topic}, ${argv.board}, ${item.timestamp/1000}, ${users[item.user.username]}, (select id_character FROM sbb_characters WHERE is_main=1 and id_member=${users[item.user.username]}), ${SqlString.escape(inputJson.title)}, ${SqlString.escape(item.content)})`
-    });
+  let posts = await Promise.all(inputJson.posts.map(async (item) => await makePostOutput(item, users)));
+  //let posts = inputJson.posts.map(async (item) => await makePostOutput(item, users));
 
   return fs.writeFile(argv.out, preamble + posts.join(',') + ';');
 }).then(() => fs.appendFile(argv.out, `\nUPDATE sbb_topics SET num_replies=num_replies+${inputJson.posts.length} WHERE id_topic=${argv.topic}`));
